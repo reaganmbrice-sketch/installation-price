@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Quick Qualification — Interactive Quote (v6)</title>
+<style>
+  body { margin:0; background:#f7f3ef; font:16px/1.5 system-ui; color:#1e1e1e;}
+  header { background:#111; padding:20px; border-bottom:3px solid #c4a574; display:flex; align-items:center; gap:16px;}
+  header img { height:60px; width:auto;}
+  header .brand-text { color:#fff; font-family:Georgia,serif; font-size:24px; font-weight:700;}
+  .container { max-width:1100px; margin:24px auto; padding:0 16px 32px; display:grid; grid-template-columns:1fr 360px; gap:24px;}
+  .card { background:#fff; border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,.08); padding:20px;}
+  h2,h3 { font-family:Georgia,serif; margin:0 0 12px; color:#2a2a2a;}
+  label { display:block; margin:12px 0 6px; font-weight:600; color:#6b6460;}
+  select,input { width:100%; padding:12px 14px; border-radius:12px; border:1px solid #ddd;}
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .totals .line { display:flex; justify-content:space-between; padding:6px 0;}
+  .totals .line.total { font-weight:800; font-size:18px; border-top:1px dashed #ddd; margin-top:8px; padding-top:10px;}
+  .btn { padding:12px 16px; border-radius:999px; border:1px solid #c4a574; background:#c4a574; color:#fff; font-weight:700; cursor:pointer; margin-right:8px;}
+  .btn.secondary { background:transparent; color:#c4a574;}
+</style>
+</head>
+<body>
+<header>
+  <img src="https://cdn.shopify.com/s/files/1/0571/3631/6623/files/BONKANDCO_MAIN_LOGO_large_0fb656fb-7f65-45f4-bb76-a770ecb285e0.png?v=1621930232" alt="Bonk & Co Logo"/>
+  <div class="brand-text">Quick Qualification</div>
+</header>
+<div class="container">
+<main class="grid">
+<section class="card">
+  <h2>Configuration</h2>
+  <div class="row">
+    <div>
+      <label for="stove">Stove</label>
+      <select id="stove"></select>
+    </div>
+    <div>
+      <label for="flue">Flue</label>
+      <select id="flue"></select>
+    </div>
+  </div>
+  <div class="row">
+    <div>
+      <label for="hearth">Hearth / Slate</label>
+      <select id="hearth"></select>
+    </div>
+    <div>
+      <label for="mantle">Mantle / Surround</label>
+      <select id="mantle"></select>
+    </div>
+  </div>
+  <div class="row">
+    <div>
+      <label for="picture-frame">Picture frame</label>
+      <select id="picture-frame"></select>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Labour & Travel</h2>
+  <div class="row">
+    <div>
+      <label for="labour-days">Labour (days)</label>
+      <input id="labour-days" type="number" min="0" step="0.5" value="0"/>
+    </div>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <div>
+      <label for="miles">Travel distance (miles)</label>
+      <input id="miles" type="number" min="0" step="1"/>
+    </div>
+  </div>
+  <div style="margin-top:12px">
+    <label for="building">Building materials</label>
+    <select id="building"></select>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Client details</h2>
+  <div class="row">
+    <div>
+      <label for="customer">Name</label>
+      <input id="customer" type="text"/>
+    </div>
+    <div>
+      <label for="tel">Telephone</label>
+      <input id="tel" type="tel"/>
+    </div>
+  </div>
+  <div class="row">
+    <div>
+      <label for="email">Email</label>
+      <input id="email" type="email"/>
+    </div>
+    <div>
+      <label for="w3w">what3words</label>
+      <input id="w3w" type="text"/>
+    </div>
+  </div>
+  <div>
+    <label for="address">Address</label>
+    <input id="address" type="text"/>
+  </div>
+  <div>
+    <label for="notes">Notes</label>
+    <input id="notes" type="text"/>
+  </div>
+</section>
+</main>
+
+<aside>
+  <div class="card">
+    <h3>Summary</h3>
+    <div id="summary-list" class="totals"></div>
+    <div class="totals">
+      <div class="line">
+        <span>Subtotal (ex VAT)</span>
+        <strong id="subtotal">£0.00</strong>
+      </div>
+      <div class="line">
+        <span>VAT (20%)</span>
+        <strong id="vat">£0.00</strong>
+      </div>
+      <div class="line total">
+        <span>Total (inc VAT)</span>
+        <strong id="total">£0.00</strong>
+      </div>
+    </div>
+    <div style="margin-top:16px">
+      <button class="btn" onclick="window.print()">Print / Save as PDF</button>
+      <button class="btn secondary" id="export-json">Export JSON</button>
+    </div>
+  </div>
+</aside>
+</div>
+
+<script>
+const DATA = {
+  stoves: [
+    { label: "None — None", price: 0.0 },
+    { label: "Charnwood — Aire 5", price: 1329.17 },
+    { label: "Charnwood — Aire 5 - Store Stand", price: 1412.0 },
+    { label: "Charnwood — Aire 7", price: 1662.5 },
+    { label: "Charnwood — Aire 7 - Store Stand", price: 1745.83 },
+    { label: "Charnwood — C-Four", price: 995.83 },
+    { label: "Charnwood — C-Five", price: 1079.17 },
+    { label: "Charnwood — Cranmore 5", price: 1370.83 },
+    { label: "Woodwarm — Eco 5", price: 1460.0 },
+    { label: "Woodwarm — Eco 5 - Log Store", price: 1577.0 },
+    { label: "Woodwarm — Eco 7", price: 1587.0 },
+    { label: "Woodwarm — Eco 7 - Log Store", price: 1738.0 },
+    { label: "Woodwarm — Fireview Inset", price: 1587.0 },
+    { label: "RAIS — Viva L 100", price: 2623.33 },
+    { label: "RAIS — Viva L 120", price: 3215.83 },
+    { label: "RAIS — Viva L 140", price: 3608.33 },
+    { label: "RAIS — Caro", price: 2345.0 },
+    { label: "HWAM — 3120", price: 2037.5 },
+    { label: "HWAM — 2610", price: 2120.83 },
+    { label: "Wiking — Mini 2", price: 1204.17 },
+    { label: "Wiking — Mini 4", price: 1495.83 }
+  ],
+  slate: [
+    { label: "None", price: 0.0 },
+    { label: "Caithness Slate Antique - 1000 x 1000 x 25mm", price: 374.0 },
+    { label: "Caithness Slate Antique - 1200 x 1200 x 25mm", price: 553.35 },
+    { label: "Caithness Slate Antique - 1600 Set", price: 633.097 },
+    { label: "Caithness Slate Antique - 1600 Front Hearth", price: 383.62 },
+    { label: "Caithness Slate Brushed - 1000 x 1000 x 25mm", price: 318.002 },
+    { label: "Caithness Slate Brushed - 1200 x 1200 x 25mm", price: 476.0 },
+    { label: "Caithness Slate Brushed - 1600 Set", price: 549.015 },
+    { label: "Caithness Slate Brushed - 1600 Front Hearth", price: 333.81 }
+  ],
+  slatePicture: [
+    { label: "None", price: 0.0 },
+    { label: "Caithness Slate Antique (PIC FRAME) - 3no (SET) x 1200 x 150 x 25mm", price: 215.475 }
+  ],
+  mantle: [
+    { label: "None", price: 0.0 },
+    { label: "Leeds", price: 1663.33 },
+    { label: "Huntley", price: 2483.33 },
+    { label: "Balfour", price: 985.0 },
+    { label: "Oak shelf", price: 400.0 },
+    { label: "Telford", price: 312.9 },
+    { label: "Dartmoor", price: 358.8 }
+  ],
+  flue: [
+    { label: "Liner Bungalow", price: 877.61 },
+    { label: "Liner Storey and a half", price: 1044.19 },
+    { label: "Liner 2 Storey", price: 1210.77 },
+    { label: "Twin Wall - Bungalow", price: 1700.0 },
+    { label: "Twin Wall - 1.5 Storey", price: 2150.0 },
+    { label: "Twin Wall - Cathedral", price: 2200.0 },
+    { label: "Twin Wall - 2 Storey", price: 2250.0 }
+  ],
+  building: [
+    { Product: "Flue + Hearth + Full Surround with ripout", Price: 300.0 },
+    { Product: "Flue + Hearth + shelf", Price: 200.0 },
+    { Product: "Just Flue", Price: 100.0 }
+  ]
+};
+
+const LABOUR_DAY_RATE = 810;  // 2 days = 1620 in the sheet
+const TRAVEL_RATE = 0.75;
+
+function money(v) {
+  return "£" + (v || 0).toFixed(2);
+}
+
+function fill(select, options) {
+  select.innerHTML = "";
+  const opt0 = document.createElement("option");
+  opt0.value = "";
+  opt0.textContent = "— Select —";
+  opt0.dataset.price = "0";
+  select.appendChild(opt0);
+
+  for (const o of options) {
+    const el = document.createElement("option");
+    el.value = o.label;
+    el.textContent = o.label;
+    el.dataset.price = String(o.price);
+    select.appendChild(el);
+  }
+}
+
+function currentPrice(select) {
+  const sel = select.options[select.selectedIndex];
+  return sel ? Number(sel.dataset.price || 0) : 0;
+}
+
+function update() {
+  const summary = document.getElementById("summary-list");
+  const stoveSel = document.getElementById("stove");
+  const flueSel = document.getElementById("flue");
+  const hearthSel = document.getElementById("hearth");
+  const mantleSel = document.getElementById("mantle");
+  const pictureSel = document.getElementById("picture-frame");
+  const buildingSel = document.getElementById("building");
+
+  const miles = Number(document.getElementById("miles").value || 0);
+  const travel = miles * TRAVEL_RATE;
+
+  const labourDays = Number(document.getElementById("labour-days").value || 0);
+  const labour = labourDays * LABOUR_DAY_RATE;
+
+  const items = [
+    ["Stove", stoveSel.value, currentPrice(stoveSel)],
+    ["Flue", flueSel.value, currentPrice(flueSel)],
+    ["Hearth", hearthSel.value, currentPrice(hearthSel)],
+    ["Mantle", mantleSel.value, currentPrice(mantleSel)],
+    ["Picture frame", pictureSel.value, currentPrice(pictureSel)],
+    ["Building materials", buildingSel.value, currentPrice(buildingSel)],
+    ["Labour", "", labour],
+    ["Travel", "", travel]
+  ];
+
+  let subtotal = 0;
+  summary.innerHTML = "";
+
+  for (const [label, choice, price] of items) {
+    if (!choice && label !== "Labour" && label !== "Travel") continue;
+    subtotal += Number(price || 0);
+    const row = document.createElement("div");
+    row.className = "line";
+    row.innerHTML = `<span>${label}</span><strong>${money(Number(price || 0))}</strong>`;
+    summary.appendChild(row);
+  }
+
+  const vat = subtotal * 0.20;
+  const total = subtotal + vat;
+
+  document.getElementById("subtotal").textContent = money(subtotal);
+  document.getElementById("vat").textContent = money(vat);
+  document.getElementById("total").textContent = money(total);
+}
+
+function init() {
+  fill(document.getElementById("stove"), DATA.stoves);
+  fill(document.getElementById("flue"), DATA.flue);
+  fill(document.getElementById("hearth"), DATA.slate);
+  fill(document.getElementById("mantle"), DATA.mantle);
+  fill(document.getElementById("picture-frame"), DATA.slatePicture);
+  fill(
+    document.getElementById("building"),
+    DATA.building.map(o => ({ label: o.Product, price: o.Price }))
+  );
+
+  for (const id of [
+    "stove",
+    "flue",
+    "hearth",
+    "mantle",
+    "picture-frame",
+    "building",
+    "miles",
+    "labour-days"
+  ]) {
+    const el = document.getElementById(id);
+    el.addEventListener("input", update);
+    el.addEventListener("change", update);
+  }
+
+  document.getElementById("export-json").addEventListener("click", () => {
+    const data = {
+      customer: document.getElementById("customer").value,
+      tel: document.getElementById("tel").value,
+      email: document.getElementById("email").value,
+      w3w: document.getElementById("w3w").value,
+      address: document.getElementById("address").value,
+      notes: document.getElementById("notes").value,
+      selections: {
+        stove: document.getElementById("stove").value,
+        flue: document.getElementById("flue").value,
+        hearth: document.getElementById("hearth").value,
+        mantle: document.getElementById("mantle").value,
+        pictureFrame: document.getElementById("picture-frame").value,
+        building: document.getElementById("building").value
+      },
+      labour: {
+        days: Number(document.getElementById("labour-days").value || 0)
+      },
+      travel: {
+        miles: Number(document.getElementById("miles").value || 0)
+      }
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json"
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "quick-qualification.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+
+  update();
+}
+
+window.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

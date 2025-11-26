@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Quick Qualification — Interactive Quote (v6)</title>
+<title>Quick Qualification — Interactive Quote (v7)</title>
 <style>
   body { margin:0; background:#f7f3ef; font:16px/1.5 system-ui; color:#1e1e1e;}
   header { background:#111; padding:20px; border-bottom:3px solid #c4a574; display:flex; align-items:center; gap:16px;}
@@ -30,27 +30,37 @@
 <main class="grid">
 <section class="card">
   <h2>Configuration</h2>
+
+  <!-- Stove manufacturer + model -->
   <div class="row">
     <div>
-      <label for="stove">Stove</label>
-      <select id="stove"></select>
+      <label for="stove-manufacturer">Stove manufacturer</label>
+      <select id="stove-manufacturer"></select>
     </div>
+    <div>
+      <label for="stove-model">Stove model</label>
+      <select id="stove-model"></select>
+    </div>
+  </div>
+
+  <!-- Flue + Hearth -->
+  <div class="row">
     <div>
       <label for="flue">Flue</label>
       <select id="flue"></select>
     </div>
-  </div>
-  <div class="row">
     <div>
       <label for="hearth">Hearth / Slate</label>
       <select id="hearth"></select>
     </div>
+  </div>
+
+  <!-- Mantle + Picture frame -->
+  <div class="row">
     <div>
       <label for="mantle">Mantle / Surround</label>
       <select id="mantle"></select>
     </div>
-  </div>
-  <div class="row">
     <div>
       <label for="picture-frame">Picture frame</label>
       <select id="picture-frame"></select>
@@ -63,13 +73,13 @@
   <div class="row">
     <div>
       <label for="labour-days">Labour (days)</label>
-      <input id="labour-days" type="number" min="0" step="0.5" value="0"/>
+      <input id="labour-days" type="number" min="0" step="0.5" value="0" inputmode="decimal"/>
     </div>
   </div>
   <div class="row" style="margin-top:8px">
     <div>
       <label for="miles">Travel distance (miles)</label>
-      <input id="miles" type="number" min="0" step="1"/>
+      <input id="miles" type="number" min="0" step="1" inputmode="decimal"/>
     </div>
   </div>
   <div style="margin-top:12px">
@@ -128,7 +138,6 @@
         <span>Total (inc VAT)</span>
         <strong id="total">£0.00</strong>
       </div>
-      <!-- NEW: Indicative price range (matches spreadsheet logic) -->
       <div class="line indicative">
         <span>Indicative price range</span>
         <strong id="indicative">£0-500</strong>
@@ -144,28 +153,29 @@
 
 <script>
 const DATA = {
+  // Stove data split into manufacturer + model
   stoves: [
-    { label: "None — None", price: 0.0 },
-    { label: "Charnwood — Aire 5", price: 1329.17 },
-    { label: "Charnwood — Aire 5 - Store Stand", price: 1412.0 },
-    { label: "Charnwood — Aire 7", price: 1662.5 },
-    { label: "Charnwood — Aire 7 - Store Stand", price: 1745.83 },
-    { label: "Charnwood — C-Four", price: 995.83 },
-    { label: "Charnwood — C-Five", price: 1079.17 },
-    { label: "Charnwood — Cranmore 5", price: 1370.83 },
-    { label: "Woodwarm — Eco 5", price: 1460.0 },
-    { label: "Woodwarm — Eco 5 - Log Store", price: 1577.0 },
-    { label: "Woodwarm — Eco 7", price: 1587.0 },
-    { label: "Woodwarm — Eco 7 - Log Store", price: 1738.0 },
-    { label: "Woodwarm — Fireview Inset", price: 1587.0 },
-    { label: "RAIS — Viva L 100", price: 2623.33 },
-    { label: "RAIS — Viva L 120", price: 3215.83 },
-    { label: "RAIS — Viva L 140", price: 3608.33 },
-    { label: "RAIS — Caro", price: 2345.0 },
-    { label: "HWAM — 3120", price: 2037.5 },
-    { label: "HWAM — 2610", price: 2120.83 },
-    { label: "Wiking — Mini 2", price: 1204.17 },
-    { label: "Wiking — Mini 4", price: 1495.83 }
+    { manufacturer: "None",       model: "None",                 price: 0.0 },
+    { manufacturer: "Charnwood",  model: "Aire 5",               price: 1329.17 },
+    { manufacturer: "Charnwood",  model: "Aire 5 - Store Stand", price: 1412.0 },
+    { manufacturer: "Charnwood",  model: "Aire 7",               price: 1662.5 },
+    { manufacturer: "Charnwood",  model: "Aire 7 - Store Stand", price: 1745.83 },
+    { manufacturer: "Charnwood",  model: "C-Four",               price: 995.83 },
+    { manufacturer: "Charnwood",  model: "C-Five",               price: 1079.17 },
+    { manufacturer: "Charnwood",  model: "Cranmore 5",           price: 1370.83 },
+    { manufacturer: "Woodwarm",   model: "Eco 5",                price: 1460.0 },
+    { manufacturer: "Woodwarm",   model: "Eco 5 - Log Store",    price: 1577.0 },
+    { manufacturer: "Woodwarm",   model: "Eco 7",                price: 1587.0 },
+    { manufacturer: "Woodwarm",   model: "Eco 7 - Log Store",    price: 1738.0 },
+    { manufacturer: "Woodwarm",   model: "Fireview Inset",       price: 1587.0 },
+    { manufacturer: "RAIS",       model: "Viva L 100",           price: 2623.33 },
+    { manufacturer: "RAIS",       model: "Viva L 120",           price: 3215.83 },
+    { manufacturer: "RAIS",       model: "Viva L 140",           price: 3608.33 },
+    { manufacturer: "RAIS",       model: "Caro",                 price: 2345.0 },
+    { manufacturer: "HWAM",       model: "3120",                 price: 2037.5 },
+    { manufacturer: "HWAM",       model: "2610",                 price: 2120.83 },
+    { manufacturer: "Wiking",     model: "Mini 2",               price: 1204.17 },
+    { manufacturer: "Wiking",     model: "Mini 4",               price: 1495.83 }
   ],
   slate: [
     { label: "None", price: 0.0 },
@@ -225,7 +235,6 @@ function fill(select, options) {
   for (const o of options) {
     const el = document.createElement("option");
     el.value = o.label;
-    // Shows label + indicative unit price
     el.textContent = `${o.label} — £${o.price.toFixed(2)}`;
     el.dataset.price = String(o.price);
     select.appendChild(el);
@@ -237,14 +246,62 @@ function currentPrice(select) {
   return sel ? Number(sel.dataset.price || 0) : 0;
 }
 
+// Stove-specific helpers
+function fillStoveManufacturers(select) {
+  select.innerHTML = "";
+  const opt0 = document.createElement("option");
+  opt0.value = "";
+  opt0.textContent = "— Select manufacturer —";
+  select.appendChild(opt0);
+
+  const seen = new Set();
+  for (const stove of DATA.stoves) {
+    if (!stove.manufacturer || seen.has(stove.manufacturer)) continue;
+    seen.add(stove.manufacturer);
+    const el = document.createElement("option");
+    el.value = stove.manufacturer;
+    el.textContent = stove.manufacturer;
+    select.appendChild(el);
+  }
+}
+
+function fillStoveModels(select, manufacturer) {
+  select.innerHTML = "";
+  if (!manufacturer) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "— Select manufacturer first —";
+    opt.dataset.price = "0";
+    select.appendChild(opt);
+    return;
+  }
+
+  const opt0 = document.createElement("option");
+  opt0.value = "";
+  opt0.textContent = "— Select model —";
+  opt0.dataset.price = "0";
+  select.appendChild(opt0);
+
+  for (const stove of DATA.stoves) {
+    if (stove.manufacturer !== manufacturer) continue;
+    const el = document.createElement("option");
+    el.value = stove.model;
+    el.textContent = `${stove.model} — £${stove.price.toFixed(2)}`;
+    el.dataset.price = String(stove.price);
+    select.appendChild(el);
+  }
+}
+
 function update() {
   const summary = document.getElementById("summary-list");
-  const stoveSel = document.getElementById("stove");
-  const flueSel = document.getElementById("flue");
-  const hearthSel = document.getElementById("hearth");
-  const mantleSel = document.getElementById("mantle");
-  const pictureSel = document.getElementById("picture-frame");
-  const buildingSel = document.getElementById("building");
+
+  const stoveManuSel  = document.getElementById("stove-manufacturer");
+  const stoveModelSel = document.getElementById("stove-model");
+  const flueSel       = document.getElementById("flue");
+  const hearthSel     = document.getElementById("hearth");
+  const mantleSel     = document.getElementById("mantle");
+  const pictureSel    = document.getElementById("picture-frame");
+  const buildingSel   = document.getElementById("building");
 
   const miles = Number(document.getElementById("miles").value || 0);
   const travel = miles * TRAVEL_RATE;
@@ -252,8 +309,13 @@ function update() {
   const labourDays = Number(document.getElementById("labour-days").value || 0);
   const labour = labourDays * LABOUR_DAY_RATE;
 
+  const stoveManufacturer = stoveManuSel.value;
+  const stoveModel = stoveModelSel.value;
+  const stovePrice = currentPrice(stoveModelSel);
+  const stoveDisplay = stoveModel ? `${stoveManufacturer} — ${stoveModel}` : "";
+
   const items = [
-    ["Stove", stoveSel.value, currentPrice(stoveSel)],
+    ["Stove", stoveDisplay, stovePrice],
     ["Flue", flueSel.value, currentPrice(flueSel)],
     ["Hearth", hearthSel.value, currentPrice(hearthSel)],
     ["Mantle", mantleSel.value, currentPrice(mantleSel)],
@@ -282,9 +344,8 @@ function update() {
   document.getElementById("vat").textContent = money(vat);
   document.getElementById("total").textContent = money(total);
 
-  // NEW: Indicative price range, matching Excel:
-  // ="£"&ROUNDDOWN(D17,-2)&"-"&ROUNDDOWN(D17,-2)+500
-  const base = Math.floor(total / 100) * 100;   // ROUNDDOWN to nearest 100
+  // Indicative range (matches spreadsheet logic)
+  const base = Math.floor(total / 100) * 100;   // round down to nearest 100
   const indicativeMin = base;
   const indicativeMax = base + 500;
   const indicativeEl = document.getElementById("indicative");
@@ -295,7 +356,22 @@ function update() {
 }
 
 function init() {
-  fill(document.getElementById("stove"), DATA.stoves);
+  // Stove dropdowns
+  const stoveManuSel  = document.getElementById("stove-manufacturer");
+  const stoveModelSel = document.getElementById("stove-model");
+
+  fillStoveManufacturers(stoveManuSel);
+  fillStoveModels(stoveModelSel, ""); // placeholder
+
+  stoveManuSel.addEventListener("change", () => {
+    fillStoveModels(stoveModelSel, stoveManuSel.value);
+    update();
+  });
+
+  stoveModelSel.addEventListener("change", update);
+  stoveModelSel.addEventListener("input", update);
+
+  // Other dropdowns
   fill(document.getElementById("flue"), DATA.flue);
   fill(document.getElementById("hearth"), DATA.slate);
   fill(document.getElementById("mantle"), DATA.mantle);
@@ -306,7 +382,6 @@ function init() {
   );
 
   for (const id of [
-    "stove",
     "flue",
     "hearth",
     "mantle",
@@ -329,7 +404,8 @@ function init() {
       address: document.getElementById("address").value,
       notes: document.getElementById("notes").value,
       selections: {
-        stove: document.getElementById("stove").value,
+        stoveManufacturer: document.getElementById("stove-manufacturer").value,
+        stoveModel: document.getElementById("stove-model").value,
         flue: document.getElementById("flue").value,
         hearth: document.getElementById("hearth").value,
         mantle: document.getElementById("mantle").value,

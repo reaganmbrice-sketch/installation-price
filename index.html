@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Quick Qualification — Interactive Quote (v7)</title>
+<title>Quick Qualification — Interactive Quote (v20 Showroom)</title>
 <style>
   body { margin:0; background:#f7f3ef; font:16px/1.5 system-ui; color:#1e1e1e;}
   header { background:#111; padding:20px; border-bottom:3px solid #c4a574; display:flex; align-items:center; gap:16px;}
@@ -17,21 +17,34 @@
   .totals .line { display:flex; justify-content:space-between; padding:6px 0;}
   .totals .line.total { font-weight:800; font-size:18px; border-top:1px dashed #ddd; margin-top:8px; padding-top:10px;}
   .totals .line.indicative { font-style:italic; font-size:14px; opacity:0.9; }
+  .totals .line.meta { font-size:14px; opacity:0.9; }
+  .hint { font-size:13px; color:#6b6460; margin-top:6px; }
   .btn { padding:12px 16px; border-radius:999px; border:1px solid #c4a574; background:#c4a574; color:#fff; font-weight:700; cursor:pointer; margin-right:8px;}
   .btn.secondary { background:transparent; color:#c4a574;}
+  .hidden { display:none !important; }
+  @media print { .container { grid-template-columns:1fr; } }
 </style>
 </head>
+
 <body>
 <header>
   <img src="https://cdn.shopify.com/s/files/1/0571/3631/6623/files/BONKANDCO_MAIN_LOGO_large_0fb656fb-7f65-45f4-bb76-a770ecb285e0.png?v=1621930232" alt="Bonk & Co Logo"/>
   <div class="brand-text">Quick Qualification</div>
 </header>
+
 <div class="container">
 <main class="grid">
-<section class="card">
-  <h2>Configuration</h2>
 
-  <!-- Stove manufacturer + model -->
+<section class="card">
+  <h2>Installation</h2>
+  <label for="install-type">Installation type</label>
+  <select id="install-type"></select>
+  <div class="hint">All quotes are subject to a site survey.</div>
+</section>
+
+<section class="card">
+  <h2>Products</h2>
+
   <div class="row">
     <div>
       <label for="stove-manufacturer">Stove manufacturer</label>
@@ -43,20 +56,20 @@
     </div>
   </div>
 
-  <!-- Flue + Hearth -->
   <div class="row">
     <div>
       <label for="flue">Flue</label>
       <select id="flue"></select>
+      <div class="hint">Flue options depend on installation type.</div>
     </div>
     <div>
       <label for="hearth">Hearth / Slate</label>
       <select id="hearth"></select>
+      <div class="hint" id="hearth-hint">Hearth options depend on installation type.</div>
     </div>
   </div>
 
-  <!-- Mantle + Picture frame -->
-  <div class="row">
+  <div class="row" id="surround-row">
     <div>
       <label for="mantle">Mantle / Surround</label>
       <select id="mantle"></select>
@@ -66,25 +79,17 @@
       <select id="picture-frame"></select>
     </div>
   </div>
+
+  <div id="surround-hint" class="hint hidden">Surround options are not available for freestanding twinwall installations.</div>
 </section>
 
 <section class="card">
-  <h2>Labour & Travel</h2>
+  <h2>Travel</h2>
   <div class="row">
-    <div>
-      <label for="labour-days">Labour (days)</label>
-      <input id="labour-days" type="number" min="0" step="0.5" value="0" inputmode="decimal"/>
-    </div>
-  </div>
-  <div class="row" style="margin-top:8px">
     <div>
       <label for="miles">Travel distance (miles)</label>
       <input id="miles" type="number" min="0" step="1" inputmode="decimal"/>
     </div>
-  </div>
-  <div style="margin-top:12px">
-    <label for="building">Building materials</label>
-    <select id="building"></select>
   </div>
 </section>
 
@@ -119,12 +124,14 @@
     <input id="notes" type="text"/>
   </div>
 </section>
+
 </main>
 
 <aside>
   <div class="card">
     <h3>Summary</h3>
     <div id="summary-list" class="totals"></div>
+
     <div class="totals">
       <div class="line">
         <span>Subtotal (ex VAT)</span>
@@ -140,9 +147,14 @@
       </div>
       <div class="line indicative">
         <span>Indicative price range</span>
-        <strong id="indicative">£0-500</strong>
+        <strong id="indicative">£0-£500</strong>
+      </div>
+      <div class="line meta">
+        <span>Note</span>
+        <strong>Subject to site survey</strong>
       </div>
     </div>
+
     <div style="margin-top:16px">
       <button class="btn" onclick="window.print()">Print / Save as PDF</button>
       <button class="btn secondary" id="export-json">Export JSON</button>
@@ -152,79 +164,111 @@
 </div>
 
 <script>
+// ===== Pricing basis =====
+const MAN_HOURLY_RATE = 45.00;
+const DEFAULT_CREW = 2;
+const DEFAULT_HOURS_PER_DAY = 8; // baseline used for day pricing
+
+// NEW: labour hours variation (affects totals only; not shown in summary)
+const LABOUR_DAY_HOURS_OPTIONS = [8, 9, 10];
+// Choose a default and keep it hidden from the user.
+// "9" is a practical middle-ground; change to 8 or 10 if you want a tighter/looser qualifier.
+const DEFAULT_LABOUR_DAY_HOURS = 9;
+
+const TRAVEL_RATE = 0.75;
+
+// ===== Tuning tweaks =====
+const MIN_EFFECTIVE_DAYS = 1.10;                 // applied to liner only
+const MATERIALS_FLOOR_PCT_OF_LABOUR = 0.10;
+const MATERIALS_ROUND_TO = 5;
+
+// ===== Installation types =====
+const JOB_TYPES = [
+  { id:"A_REPLACEMENT", label:"Replacement / reconnect (existing chimney)", flueFamily:"liner", labourDays:0.75, defaultFlueLabel:"Liner Bungalow", buildingMaterialsExVat:263, isFreestandingTwinwall:false },
+  { id:"B_LINER_STD",   label:"Liner install — standard (freestanding)", flueFamily:"liner", labourDays:1.0, defaultFlueLabel:"Liner Bungalow", buildingMaterialsExVat:155, isFreestandingTwinwall:false },
+  { id:"C_LINER_BUILD", label:"Liner + fireplace build/finish (tile/render/surround)", flueFamily:"liner", labourDays:1.75, defaultFlueLabel:"Liner 2 Storey", buildingMaterialsExVat:240, isFreestandingTwinwall:false },
+  { id:"D_INSET",       label:"Inset / cassette stove (liner-based)", flueFamily:"liner", labourDays:1.5, defaultFlueLabel:"Liner 2 Storey", buildingMaterialsExVat:255, isFreestandingTwinwall:false },
+
+  { id:"F_TWINWALL_EXTERNAL", label:"Twinwall — external (through wall)", flueFamily:"twinwall", labourDays:1.0, defaultFlueLabel:"Twin Wall - Bungalow", buildingMaterialsExVat:280, isFreestandingTwinwall:true, capBilledDays:2 },
+  { id:"H_TWINWALL_INTERNAL", label:"Twinwall — internal (boxed-in / through floors)", flueFamily:"twinwall", labourDays:2.0, defaultFlueLabel:"Twin Wall - 1.5 Storey", buildingMaterialsExVat:450, isFreestandingTwinwall:false },
+  { id:"G_TWINWALL_PROTECTBOX", label:"Twinwall — new build / Protect Box / airtight roof", flueFamily:"twinwall", labourDays:1.0, defaultFlueLabel:"Twin Wall - Cathedral", buildingMaterialsExVat:200, isFreestandingTwinwall:true, capBilledDays:2 },
+
+  { id:"E_BESPOKE", label:"Bespoke structure / false chimney breast / media wall", flueFamily:"twinwall", labourDays:2.5, defaultFlueLabel:"Twin Wall - 2 Storey", buildingMaterialsExVat:1140, isFreestandingTwinwall:false }
+];
+
+// ===== Product data =====
 const DATA = {
-  // Stove data split into manufacturer + model
   stoves: [
-    { manufacturer: "None",       model: "None",                 price: 0.0 },
-    { manufacturer: "Charnwood",  model: "Aire 5",               price: 1329.17 },
-    { manufacturer: "Charnwood",  model: "Aire 5 - Store Stand", price: 1412.0 },
-    { manufacturer: "Charnwood",  model: "Aire 7",               price: 1662.5 },
-    { manufacturer: "Charnwood",  model: "Aire 7 - Store Stand", price: 1745.83 },
-    { manufacturer: "Charnwood",  model: "C-Four",               price: 995.83 },
-    { manufacturer: "Charnwood",  model: "C-Five",               price: 1079.17 },
-    { manufacturer: "Charnwood",  model: "Cranmore 5",           price: 1370.83 },
-    { manufacturer: "Woodwarm",   model: "Eco 5",                price: 1460.0 },
-    { manufacturer: "Woodwarm",   model: "Eco 5 - Log Store",    price: 1577.0 },
-    { manufacturer: "Woodwarm",   model: "Eco 7",                price: 1587.0 },
-    { manufacturer: "Woodwarm",   model: "Eco 7 - Log Store",    price: 1738.0 },
-    { manufacturer: "Woodwarm",   model: "Fireview Inset",       price: 1587.0 },
-    { manufacturer: "RAIS",       model: "Viva L 100",           price: 2623.33 },
-    { manufacturer: "RAIS",       model: "Viva L 120",           price: 3215.83 },
-    { manufacturer: "RAIS",       model: "Viva L 140",           price: 3608.33 },
-    { manufacturer: "RAIS",       model: "Caro",                 price: 2345.0 },
-    { manufacturer: "HWAM",       model: "3120",                 price: 2037.5 },
-    { manufacturer: "HWAM",       model: "2610",                 price: 2120.83 },
-    { manufacturer: "Wiking",     model: "Mini 2",               price: 1204.17 },
-    { manufacturer: "Wiking",     model: "Mini 4",               price: 1495.83 }
+    { manufacturer:"None", model:"None", price:0.0 },
+    { manufacturer:"Charnwood", model:"Aire 5", price:1329.17 },
+    { manufacturer:"Charnwood", model:"Aire 5 - Store Stand", price:1412.0 },
+    { manufacturer:"Charnwood", model:"Aire 7", price:1662.5 },
+    { manufacturer:"Charnwood", model:"Aire 7 - Store Stand", price:1745.83 },
+    { manufacturer:"Charnwood", model:"C-Four", price:995.83 },
+    { manufacturer:"Charnwood", model:"C-Five", price:1079.17 },
+    { manufacturer:"Charnwood", model:"Cranmore 5", price:1370.83 },
+    { manufacturer:"Woodwarm", model:"Eco 5", price:1460.0 },
+    { manufacturer:"Woodwarm", model:"Eco 5 - Log Store", price:1577.0 },
+    { manufacturer:"Woodwarm", model:"Eco 7", price:1587.0 },
+    { manufacturer:"Woodwarm", model:"Eco 7 - Log Store", price:1738.0 },
+    { manufacturer:"Woodwarm", model:"Fireview Inset", price:1587.0 },
+    { manufacturer:"RAIS", model:"Viva L 100", price:2623.33 },
+    { manufacturer:"RAIS", model:"Viva L 120", price:3215.83 },
+    { manufacturer:"RAIS", model:"Viva L 140", price:3608.33 },
+    { manufacturer:"RAIS", model:"Caro", price:2345.0 },
+    { manufacturer:"HWAM", model:"3120", price:2037.5 },
+    { manufacturer:"HWAM", model:"2610", price:2120.83 },
+    { manufacturer:"Wiking", model:"Mini 2", price:1204.17 },
+    { manufacturer:"Wiking", model:"Mini 4", price:1495.83 }
   ],
+
+  // Hearth options tagged for filtering (including inset combo options)
   slate: [
-    { label: "None", price: 0.0 },
-    { label: "Caithness Slate Antique - 1000 x 1000 x 25mm", price: 374.0 },
-    { label: "Caithness Slate Antique - 1200 x 1200 x 25mm", price: 553.35 },
-    { label: "Caithness Slate Antique - 1600 Set", price: 633.097 },
-    { label: "Caithness Slate Antique - 1600 Front Hearth", price: 383.62 },
-    { label: "Caithness Slate Brushed - 1000 x 1000 x 25mm", price: 318.002 },
-    { label: "Caithness Slate Brushed - 1200 x 1200 x 25mm", price: 476.0 },
-    { label: "Caithness Slate Brushed - 1600 Set", price: 549.015 },
-    { label: "Caithness Slate Brushed - 1600 Front Hearth", price: 333.81 }
+    { label:"None", price:0.0, type:"none" },
+
+    { label:"Caithness Slate Antique - 1000 x 1000 x 25mm", price:374.0, type:"square" },
+    { label:"Caithness Slate Antique - 1200 x 1200 x 25mm", price:553.35, type:"square" },
+    { label:"Caithness Slate Brushed - 1000 x 1000 x 25mm", price:318.002, type:"square" },
+    { label:"Caithness Slate Brushed - 1200 x 1200 x 25mm", price:476.0, type:"square" },
+
+    { label:"Caithness Slate Antique - 1600 Set", price:633.097, type:"set" },
+    { label:"Caithness Slate Brushed - 1600 Set", price:549.015, type:"set" },
+
+    { label:"Inset set (Antique) — Front hearth + 1200 panel", price:(383.62 + 553.35), type:"inset_combo" },
+    { label:"Inset set (Brushed) — Front hearth + 1200 panel", price:(333.81 + 476.0),  type:"inset_combo" }
   ],
+
   slatePicture: [
-    { label: "None", price: 0.0 },
-    { label: "Caithness Slate Antique (PIC FRAME) - 3no (SET) x 1200 x 150 x 25mm", price: 215.475 }
+    { label:"None", price:0.0 },
+    { label:"Caithness Slate Antique (PIC FRAME) - 3no (SET) x 1200 x 150 x 25mm", price:215.475 }
   ],
+
   mantle: [
-    { label: "None", price: 0.0 },
-    { label: "Leeds", price: 1663.33 },
-    { label: "Huntley", price: 2483.33 },
-    { label: "Balfour", price: 985.0 },
-    { label: "Oak shelf", price: 400.0 },
-    { label: "Telford", price: 312.9 },
-    { label: "Dartmoor", price: 358.8 }
+    { label:"None", price:0.0 },
+    { label:"Leeds", price:1663.33 },
+    { label:"Huntley", price:2483.33 },
+    { label:"Balfour", price:985.0 },
+    { label:"Oak shelf", price:400.0 },
+    { label:"Telford", price:312.9 },
+    { label:"Dartmoor", price:358.8 }
   ],
+
   flue: [
-    { label: "Liner Bungalow", price: 877.61 },
-    { label: "Liner Storey and a half", price: 1044.19 },
-    { label: "Liner 2 Storey", price: 1210.77 },
-    { label: "Twin Wall - Bungalow", price: 1700.0 },
-    { label: "Twin Wall - 1.5 Storey", price: 2150.0 },
-    { label: "Twin Wall - Cathedral", price: 2200.0 },
-    { label: "Twin Wall - 2 Storey", price: 2250.0 }
-  ],
-  building: [
-    { Product: "Flue + Hearth + Full Surround with ripout", Price: 300.0 },
-    { Product: "Flue + Hearth + shelf", Price: 200.0 },
-    { Product: "Just Flue", Price: 100.0 }
+    { label:"Liner Bungalow", price:877.61, family:"liner" },
+    { label:"Liner Storey and a half", price:1044.19, family:"liner" },
+    { label:"Liner 2 Storey", price:1210.77, family:"liner" },
+
+    { label:"Twin Wall - Bungalow", price:1700.0, family:"twinwall" },
+    { label:"Twin Wall - 1.5 Storey", price:2150.0, family:"twinwall" },
+    { label:"Twin Wall - Cathedral", price:2200.0, family:"twinwall" },
+    { label:"Twin Wall - 2 Storey", price:2250.0, family:"twinwall" }
   ]
 };
 
-const LABOUR_DAY_RATE = 810;  // 2 days = 1620 in the sheet
-const TRAVEL_RATE = 0.75;
+// ===== Helpers =====
+function money(v){ return "£" + (v||0).toFixed(2); }
 
-function money(v) {
-  return "£" + (v || 0).toFixed(2);
-}
-
-function fill(select, options) {
+function fill(select, options){
   select.innerHTML = "";
   const opt0 = document.createElement("option");
   opt0.value = "";
@@ -232,7 +276,7 @@ function fill(select, options) {
   opt0.dataset.price = "0";
   select.appendChild(opt0);
 
-  for (const o of options) {
+  for (const o of options){
     const el = document.createElement("option");
     el.value = o.label;
     el.textContent = `${o.label} — £${o.price.toFixed(2)}`;
@@ -241,13 +285,13 @@ function fill(select, options) {
   }
 }
 
-function currentPrice(select) {
+function currentPrice(select){
   const sel = select.options[select.selectedIndex];
   return sel ? Number(sel.dataset.price || 0) : 0;
 }
 
-// Stove-specific helpers
-function fillStoveManufacturers(select) {
+// ===== Stove dropdown helpers =====
+function fillStoveManufacturers(select){
   select.innerHTML = "";
   const opt0 = document.createElement("option");
   opt0.value = "";
@@ -255,7 +299,7 @@ function fillStoveManufacturers(select) {
   select.appendChild(opt0);
 
   const seen = new Set();
-  for (const stove of DATA.stoves) {
+  for (const stove of DATA.stoves){
     if (!stove.manufacturer || seen.has(stove.manufacturer)) continue;
     seen.add(stove.manufacturer);
     const el = document.createElement("option");
@@ -265,9 +309,9 @@ function fillStoveManufacturers(select) {
   }
 }
 
-function fillStoveModels(select, manufacturer) {
+function fillStoveModels(select, manufacturer){
   select.innerHTML = "";
-  if (!manufacturer) {
+  if (!manufacturer){
     const opt = document.createElement("option");
     opt.value = "";
     opt.textContent = "— Select manufacturer first —";
@@ -282,7 +326,7 @@ function fillStoveModels(select, manufacturer) {
   opt0.dataset.price = "0";
   select.appendChild(opt0);
 
-  for (const stove of DATA.stoves) {
+  for (const stove of DATA.stoves){
     if (stove.manufacturer !== manufacturer) continue;
     const el = document.createElement("option");
     el.value = stove.model;
@@ -292,8 +336,162 @@ function fillStoveModels(select, manufacturer) {
   }
 }
 
-function update() {
+// ===== Job type helpers =====
+function fillJobTypes(){
+  const sel = document.getElementById("install-type");
+  sel.innerHTML = `<option value="">— Select —</option>` + JOB_TYPES
+    .map(j => `<option value="${j.id}">${j.label}</option>`)
+    .join("");
+}
+
+function selectedJobType(){
+  const id = document.getElementById("install-type").value;
+  return JOB_TYPES.find(j => j.id === id) || null;
+}
+
+// ===== Flue filtering =====
+function fillFlueForJob(job){
+  const family = job?.flueFamily || "either";
+  const options = DATA.flue.filter(f => family === "either" ? true : f.family === family);
+  const flueSel = document.getElementById("flue");
+  fill(flueSel, options);
+
+  if (job?.defaultFlueLabel){
+    const match = options.find(o => o.label === job.defaultFlueLabel);
+    if (match) flueSel.value = match.label;
+  }
+}
+
+// ===== Hearth filtering =====
+function hearthModeForJob(job){
+  if (!job) return "any";
+  if (job.id === "D_INSET") return "inset";
+  if (job.id === "C_LINER_BUILD" || job.id === "E_BESPOKE") return "chamber";
+  return "freestanding";
+}
+
+function fillHearthForJob(job){
+  const mode = hearthModeForJob(job);
+  const hearthSel = document.getElementById("hearth");
+  const hint = document.getElementById("hearth-hint");
+
+  let allowedTypes = null;
+  let hintText = "Hearth options depend on installation type.";
+
+  if (mode === "freestanding"){
+    allowedTypes = new Set(["none", "square"]);
+    hintText = "Freestanding: square hearths only.";
+  } else if (mode === "chamber"){
+    allowedTypes = new Set(["none", "set"]);
+    hintText = "Chamber install: slate sets only.";
+  } else if (mode === "inset"){
+    allowedTypes = new Set(["none", "inset_combo"]);
+    hintText = "Inset: choose a combined front hearth + 1200 panel set.";
+  }
+
+  const options = DATA.slate.filter(s => allowedTypes ? allowedTypes.has(s.type) : true);
+  const prev = hearthSel.value;
+
+  fill(hearthSel, options);
+
+  if (prev && options.some(o => o.label === prev)){
+    hearthSel.value = prev;
+  }
+
+  if (hint) hint.textContent = hintText;
+}
+
+// ===== Twinwall freestanding rules =====
+function applyTwinwallFreestandingRules(job){
+  const hide = !!job?.isFreestandingTwinwall;
+  const surroundRow = document.getElementById("surround-row");
+  const surroundHint = document.getElementById("surround-hint");
+
+  surroundRow.classList.toggle("hidden", hide);
+  surroundHint.classList.toggle("hidden", !hide);
+
+  if (hide){
+    document.getElementById("mantle").value = "";
+    document.getElementById("picture-frame").value = "";
+  }
+}
+
+// ===== Labour / materials =====
+function roundUpToFullDays(days){
+  const d = Number(days || 0);
+  if (d <= 0) return 0;
+  return Math.ceil(d);
+}
+
+// NEW: choose labour hours per day by job (hidden from UI + summary)
+// Returns 8, 9, or 10.
+function labourHoursPerDayForJob(job){
+  if (!job) return DEFAULT_LABOUR_DAY_HOURS;
+
+  // Heavier / fiddlier jobs trend longer
+  if (job.id === "H_TWINWALL_INTERNAL" || job.id === "E_BESPOKE") return 10;
+
+  // Medium complexity
+  if (job.id === "C_LINER_BUILD" || job.id === "D_INSET") return 9;
+
+  // Most jobs
+  return 8;
+}
+
+function computeLabour(job){
+  if (!job) return { expectedDays:0, effectiveDays:0, billedDays:0, labourExVat:0 };
+
+  const expectedDays = Number(job.labourDays || 0);
+
+  const shouldBias = job.flueFamily === "liner";
+  const effectiveDays = shouldBias ? Math.max(expectedDays, MIN_EFFECTIVE_DAYS) : expectedDays;
+
+  let billedDays = roundUpToFullDays(effectiveDays);
+  if (job.capBilledDays) billedDays = Math.min(billedDays, job.capBilledDays);
+
+  // IMPORTANT: labour hours per day can be 8/9/10 (hidden)
+  const hoursPerDay = labourHoursPerDayForJob(job);
+
+  const manHours = billedDays * DEFAULT_CREW * hoursPerDay;
+  const labourExVat = manHours * MAN_HOURLY_RATE;
+
+  return { expectedDays, effectiveDays, billedDays, labourExVat };
+}
+
+function computeBuildingMaterials(job, labourExVat){
+  if (!job) return 0;
+  const base = Number(job.buildingMaterialsExVat || 0);
+  const floor = labourExVat * MATERIALS_FLOOR_PCT_OF_LABOUR;
+  const chosen = Math.max(base, floor);
+  return Math.round(chosen / MATERIALS_ROUND_TO) * MATERIALS_ROUND_TO;
+}
+
+// ===== Indicative range (tight) =====
+function computeIndicativeRange(totalIncVat, job){
+  let pct = 0.08;
+  let buffer = 250;
+
+  if (job?.id === "A_REPLACEMENT" || job?.id === "B_LINER_STD"){
+    pct = 0.06; buffer = 200;
+  }
+  if (job?.id === "H_TWINWALL_INTERNAL"){
+    pct = 0.10; buffer = 350;
+  }
+  if (job?.id === "E_BESPOKE"){
+    pct = 0.12; buffer = 400;
+  }
+
+  const spread = (totalIncVat * pct) + buffer;
+  const minR = Math.floor(Math.max(0, totalIncVat - spread) / 100) * 100;
+  const maxR = Math.ceil((totalIncVat + spread) / 100) * 100;
+
+  return { minR, maxR };
+}
+
+// ===== Main update =====
+function update(){
   const summary = document.getElementById("summary-list");
+  const job = selectedJobType();
 
   const stoveManuSel  = document.getElementById("stove-manufacturer");
   const stoveModelSel = document.getElementById("stove-model");
@@ -301,39 +499,68 @@ function update() {
   const hearthSel     = document.getElementById("hearth");
   const mantleSel     = document.getElementById("mantle");
   const pictureSel    = document.getElementById("picture-frame");
-  const buildingSel   = document.getElementById("building");
 
   const miles = Number(document.getElementById("miles").value || 0);
   const travel = miles * TRAVEL_RATE;
-
-  const labourDays = Number(document.getElementById("labour-days").value || 0);
-  const labour = labourDays * LABOUR_DAY_RATE;
 
   const stoveManufacturer = stoveManuSel.value;
   const stoveModel = stoveModelSel.value;
   const stovePrice = currentPrice(stoveModelSel);
   const stoveDisplay = stoveModel ? `${stoveManufacturer} — ${stoveModel}` : "";
 
+  const flueName = flueSel.value;
+  const hearthName = hearthSel.value;
+  const mantleName = mantleSel.value;
+  const pictureName = pictureSel.value;
+
+  const fluePrice = currentPrice(flueSel);
+  const hearthPrice = currentPrice(hearthSel);
+  const mantlePrice = currentPrice(mantleSel);
+  const picturePrice = currentPrice(pictureSel);
+
+  const labour = computeLabour(job);
+  const buildingMaterials = computeBuildingMaterials(job, labour.labourExVat);
+
   const items = [
-    ["Stove", stoveDisplay, stovePrice],
-    ["Flue", flueSel.value, currentPrice(flueSel)],
-    ["Hearth", hearthSel.value, currentPrice(hearthSel)],
-    ["Mantle", mantleSel.value, currentPrice(mantleSel)],
-    ["Picture frame", pictureSel.value, currentPrice(pictureSel)],
-    ["Building materials", buildingSel.value, currentPrice(buildingSel)],
-    ["Labour", "", labour],
-    ["Travel", "", travel]
+    { kind:"meta", label:"Installation type", choice: job ? job.label : "—", price:null },
+    { kind:"line", label:"Stove", choice: stoveDisplay, price: stovePrice },
+    { kind:"line", label:"Flue", choice: flueName, price: fluePrice },
+    { kind:"line", label:"Hearth", choice: hearthName, price: hearthPrice }
   ];
+
+  if (!job?.isFreestandingTwinwall){
+    items.push(
+      { kind:"line", label:"Mantle", choice: mantleName, price: mantlePrice },
+      { kind:"line", label:"Picture frame", choice: pictureName, price: picturePrice }
+    );
+  }
+
+  // NOTE: Summary still shows "Labour" as days only (not hours/day)
+  items.push(
+    { kind:"line", label:"Building materials", choice:"", price: buildingMaterials },
+    { kind:"line", label:"Labour", choice: `${labour.billedDays} day${labour.billedDays === 1 ? "" : "s"}`, price: labour.labourExVat },
+    { kind:"line", label:"Travel", choice: miles ? `${miles} miles` : "", price: travel },
+    { kind:"meta", label:"Note", choice:"Final price confirmed after site survey", price:null }
+  );
 
   let subtotal = 0;
   summary.innerHTML = "";
 
-  for (const [label, choice, price] of items) {
-    if (!choice && label !== "Labour" && label !== "Travel") continue;
-    subtotal += Number(price || 0);
+  for (const it of items){
+    const hasChoice = !!(it.choice && String(it.choice).trim().length);
+    const alwaysShow = ["Building materials","Labour","Travel"].includes(it.label);
+    if (it.kind === "line" && !alwaysShow && !hasChoice) continue;
+
     const row = document.createElement("div");
     row.className = "line";
-    row.innerHTML = `<span>${label}</span><strong>${money(Number(price || 0))}</strong>`;
+
+    if (it.kind === "meta"){
+      row.className = "line meta";
+      row.innerHTML = `<span>${it.label}: ${it.choice || "—"}</span><strong>—</strong>`;
+    } else {
+      subtotal += Number(it.price || 0);
+      row.innerHTML = `<span>${it.label}${hasChoice ? ` — ${it.choice}` : ""}</span><strong>${money(Number(it.price || 0))}</strong>`;
+    }
     summary.appendChild(row);
   }
 
@@ -344,58 +571,54 @@ function update() {
   document.getElementById("vat").textContent = money(vat);
   document.getElementById("total").textContent = money(total);
 
-  // Indicative range (matches spreadsheet logic)
-  const base = Math.floor(total / 100) * 100;   // round down to nearest 100
-  const indicativeMin = base;
-  const indicativeMax = base + 500;
-  const indicativeEl = document.getElementById("indicative");
-  if (indicativeEl) {
-    indicativeEl.textContent =
-      "£" + indicativeMin.toFixed(0) + "-" + indicativeMax.toFixed(0);
-  }
+  const r = computeIndicativeRange(total, job);
+  document.getElementById("indicative").textContent = `£${r.minR.toFixed(0)}-£${r.maxR.toFixed(0)}`;
 }
 
-function init() {
-  // Stove dropdowns
+// ===== Init =====
+function init(){
+  fillJobTypes();
+
   const stoveManuSel  = document.getElementById("stove-manufacturer");
   const stoveModelSel = document.getElementById("stove-model");
-
   fillStoveManufacturers(stoveManuSel);
-  fillStoveModels(stoveModelSel, ""); // placeholder
+  fillStoveModels(stoveModelSel, "");
 
   stoveManuSel.addEventListener("change", () => {
     fillStoveModels(stoveModelSel, stoveManuSel.value);
     update();
   });
-
   stoveModelSel.addEventListener("change", update);
-  stoveModelSel.addEventListener("input", update);
 
-  // Other dropdowns
-  fill(document.getElementById("flue"), DATA.flue);
-  fill(document.getElementById("hearth"), DATA.slate);
   fill(document.getElementById("mantle"), DATA.mantle);
   fill(document.getElementById("picture-frame"), DATA.slatePicture);
-  fill(
-    document.getElementById("building"),
-    DATA.building.map(o => ({ label: o.Product, price: o.Price }))
-  );
 
-  for (const id of [
-    "flue",
-    "hearth",
-    "mantle",
-    "picture-frame",
-    "building",
-    "miles",
-    "labour-days"
-  ]) {
+  fill(document.getElementById("flue"), []);
+  fill(document.getElementById("hearth"), []);
+
+  document.getElementById("install-type").addEventListener("change", () => {
+    const job = selectedJobType();
+    fillFlueForJob(job);
+    fillHearthForJob(job);
+    applyTwinwallFreestandingRules(job);
+    update();
+  });
+
+  for (const id of ["flue","hearth","mantle","picture-frame","miles"]){
     const el = document.getElementById(id);
     el.addEventListener("input", update);
     el.addEventListener("change", update);
   }
 
   document.getElementById("export-json").addEventListener("click", () => {
+    const job = selectedJobType();
+    const labour = computeLabour(job);
+    const buildingMaterials = computeBuildingMaterials(job, labour.labourExVat);
+    const miles = Number(document.getElementById("miles").value || 0);
+
+    const stoveManu = document.getElementById("stove-manufacturer").value;
+    const stoveModel = document.getElementById("stove-model").value;
+
     const data = {
       customer: document.getElementById("customer").value,
       tel: document.getElementById("tel").value,
@@ -403,26 +626,43 @@ function init() {
       w3w: document.getElementById("w3w").value,
       address: document.getElementById("address").value,
       notes: document.getElementById("notes").value,
+
+      pricingBasis: {
+        manHourlyRate: MAN_HOURLY_RATE,
+        assumedCrew: DEFAULT_CREW,
+        labourHoursPerDayPolicy: "8/9/10 hours per day chosen by job type (hidden from summary)",
+        travelRate: TRAVEL_RATE,
+        minEffectiveDaysLinerOnly: MIN_EFFECTIVE_DAYS,
+        materialsFloorPctOfLabour: MATERIALS_FLOOR_PCT_OF_LABOUR
+      },
+
+      job: job ? {
+        id: job.id,
+        label: job.label,
+        flueFamily: job.flueFamily,
+        hearthMode: hearthModeForJob(job),
+        expectedDays: job.labourDays,
+        billedDays: labour.billedDays,
+        buildingMaterialsBaseline: job.buildingMaterialsExVat,
+        buildingMaterialsUsed: buildingMaterials,
+        isFreestandingTwinwall: job.isFreestandingTwinwall,
+        capBilledDays: job.capBilledDays || null
+      } : null,
+
       selections: {
-        stoveManufacturer: document.getElementById("stove-manufacturer").value,
-        stoveModel: document.getElementById("stove-model").value,
+        stoveManufacturer: stoveManu,
+        stoveModel: stoveModel,
+        stoveDisplay: (stoveModel ? `${stoveManu} — ${stoveModel}` : ""),
         flue: document.getElementById("flue").value,
         hearth: document.getElementById("hearth").value,
         mantle: document.getElementById("mantle").value,
-        pictureFrame: document.getElementById("picture-frame").value,
-        building: document.getElementById("building").value
+        pictureFrame: document.getElementById("picture-frame").value
       },
-      labour: {
-        days: Number(document.getElementById("labour-days").value || 0)
-      },
-      travel: {
-        miles: Number(document.getElementById("miles").value || 0)
-      }
+
+      travel: { miles }
     };
 
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: "application/json"
-    });
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type:"application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
